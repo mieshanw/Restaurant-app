@@ -28,27 +28,31 @@ self.addEventListener('install', function(event) {
 	);
 });
 
-self.addEventListener('activate', function(event) {
-	event.waitUntil(
-		caches.keys()
-		.then(function(cacheNames) {
-			return Promise.all(
-				cacheNames.filter(function(cacheName) {
-					return cacheName.startsWith('restaurant-') &&
-						   cacheName != staticCacheName;
-				}).map(function(cacheName) {
-					return caches.delete(cacheName);
-				})
-			);
-		})
-	);
-})
-
 self.addEventListener('fetch', function(event) {
-	event.respondWith(
-		caches.match(event.request)
-		.then(function(response) {
-			return response || fetch(event.request);
-		})
-	);
+  event.respondWith(
+    caches.match(event.request).then(function (response) { // check cache for requested file
+      return response || fetch(event.request).then(function (responseToFetch) { // if in cache return, else if possible fetch from network
+        return caches.open(cacheName).then(function (cache) { // if network is available put file in cache and return request
+          cache.put(event.request, responseToFetch.clone());
+          return responseToFetch;
+        });
+      });
+    }).catch(function (error) {
+      console.log('files not cached & no network connection', error); // if file is not in cache and network is'nt available 
+    })
+  );
 });
+
+self.addEventListener('activate', function(event){
+    event.waitUntil(
+    caches.keys().then(function(allCaches) {
+      return Promise.all(allCaches.map(function (thisCache){
+        if(thisCache !== cacheName) {
+          return caches.delete(thisCache);
+        }
+      }));
+    })
+  );
+});
+
+ 
